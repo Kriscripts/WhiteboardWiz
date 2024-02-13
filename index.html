@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhiteboardWiz</title>
+  <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+    <div><h1>WhiteboardWiz</h1></div>
+  <canvas id="whiteboard" width="1200" height="600"></canvas>
+  <div>
+    <button onclick="setTool('pencil')">Pencil</button>
+    <button onclick="setTool('eraser')">Eraser</button>
+    <input type="color" id="colorPicker" value="#000000" onchange="setColor()">
+    <button onclick="eraseAll()">Erase All</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const canvas = document.getElementById('whiteboard');
+    const context = canvas.getContext('2d');
+
+    let drawing = false;
+    let currentTool = 'pencil';
+    let currentColor = '#000000';
+    
+
+    // Listen for drawing events from the server
+    socket.on('draw', (data) => {
+      drawLine(data);
+    });
+
+    // Handle mouse/touch events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    function startDrawing(e) {
+      drawing = true;
+      draw(e);
+    }
+
+    function stopDrawing() {
+      drawing = false;
+      context.beginPath();
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+
+      const { offsetX, offsetY } = e;
+      const data = { x: offsetX, y: offsetY, tool: currentTool, color: currentColor };
+
+      drawLine(data);
+
+     
+      socket.emit('draw', data);
+    }
+
+    function drawLine(data) {
+      context.lineWidth = 2;
+      context.lineCap = 'round';
+      context.strokeStyle = data.tool === 'eraser' ? 'white' : data.color;
+
+      context.lineTo(data.x, data.y);
+      context.stroke();
+      context.beginPath();
+      context.moveTo(data.x, data.y);
+    }
+
+    function setTool(tool) {
+      currentTool = tool;
+    }
+
+    function setColor() {
+      currentColor = document.getElementById('colorPicker').value;
+    }
+
+    function eraseAll() {
+     
+      context.clearRect(0, 0, canvas.width, canvas.height);
+
+      
+      socket.emit('eraseAll');
+    }
+
+    
+    socket.on('eraseAll', () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+    });
+  </script>
+</body>
+</html>
